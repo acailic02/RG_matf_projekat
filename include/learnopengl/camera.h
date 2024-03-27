@@ -9,6 +9,8 @@
 
 // Defines several possible options for camera movement. Used as abstraction to stay away from window-system specific input methods
 enum Camera_Movement {
+    UPWARD,
+    DOWNWARD,
     FORWARD,
     BACKWARD,
     LEFT,
@@ -78,6 +80,10 @@ public:
             Position -= Right * velocity;
         if (direction == RIGHT)
             Position += Right * velocity;
+        if(direction == UPWARD)
+            Position.y += velocity;
+        if(direction == DOWNWARD)
+            Position.y -= velocity;
     }
 
     // processes input received from a mouse input system. Expects the offset value in both the x and y direction.
