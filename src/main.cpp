@@ -28,9 +28,11 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 
 unsigned int loadCubemap(vector<std::string> faces);
 
+unsigned int loadTexture(char const * path);
+
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1600;
+const unsigned int SCR_HEIGHT = 900;
 
 // camera
 
@@ -58,11 +60,15 @@ struct ProgramState {
     bool ImGuiEnabled = false;
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
-    glm::vec3 backpackPosition = glm::vec3(0.0f);
-    float backpackScale = 0.01f;
+    glm::vec3 forestPosition = glm::vec3(0.0f, -1.0f, 0.0f);
+    glm::vec3 shopPosition = glm::vec3(1.0f, 2.0f, -0.5f);
+    glm::vec3 campfirePosition = glm::vec3(3.1, 0.0, -0.5f);
+    float forestScale = 0.1f;
+    float shopScale = 1.7f;
+    float campfireScale = 1.5f;
     PointLight pointLight;
     ProgramState()
-            : camera(glm::vec3(0.0f, 0.0f, 3.0f)) {}
+            : camera(glm::vec3(0.0f, 8.0f, 15.0f)) {}
 
     void SaveToFile(std::string filename);
 
@@ -157,6 +163,10 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
 
     // build and compile shaders
     // -------------------------
@@ -165,13 +175,32 @@ int main() {
 
     // load models
     // -----------
-    Model ourModel("resources/objects/sky_giants_-_the_first_holy_key/scene.gltf");
-    ourModel.SetShaderTextureNamePrefix("material.");
+    Model forest("resources/objects/forest/scene.gltf");
+    forest.SetShaderTextureNamePrefix("material.");
+
+    Model shop("resources/objects/mobile_shop/scene.gltf");
+    shop.SetShaderTextureNamePrefix("material.");
+
+    Model campfire("resources/objects/Campfire/PUSHILIN_campfire.obj");
+    campfire.SetShaderTextureNamePrefix("material.");
+
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
     stbi_set_flip_vertically_on_load(true);
 
 
-    //Cubemap okvir
+    //Floor
+    float floorVertices[] = {
+            // positions          // texture Coords
+            1000.0f, -0.5f,  1000.0f, 0.0f, 1.0f, 0.0f, 1000.0f, 0.0f,
+            -1000.0f, -0.5f,  1000.0f, 0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
+            -1000.0f, -0.5f, -1000.0f, 0.0f, 1.0f, 0.0f,  0.0f, 1000.0f,
+
+            1000.0f, -0.5f,  1000.0f, 0.0f, 1.0f, 0.0f,  1000.0f, 0.0f,
+            -1000.0f, -0.5f, -1000.0f, 0.0f, 1.0f, 0.0f,  0.0f, 1000.0f,
+            1000.0f, -0.5f, -1000.0f, 0.0f, 1.0f, 0.0f,  1000.0f, 1000.0f
+    };
+
+    //Skybox
     float skyboxVertices[] = {
 
             -1.0f, -1.0f, -1.0f,
@@ -227,18 +256,25 @@ int main() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)nullptr);
     glEnableVertexAttribArray(0);
 
+    // floor VAO
+    unsigned int floorVAO, floorVBO;
+    glGenVertexArrays(1, &floorVAO);
+    glGenBuffers(1, &floorVBO);
+    glBindVertexArray(floorVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(floorVertices), &floorVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+
     //Cubemap textures
     stbi_set_flip_vertically_on_load(false);
-//    vector<std::string> faces{
-//            FileSystem::getPath("resources/textures/skybox/darksky/left.png"),
-//            FileSystem::getPath("resources/textures/skybox/darksky/right.png"),
-//            FileSystem::getPath("resources/textures/skybox/darksky/bottom.png"),
-//            FileSystem::getPath("resources/textures/skybox/darksky/top.png"),
-//            FileSystem::getPath("resources/textures/skybox/darksky/back.png"),
-//            FileSystem::getPath("resources/textures/skybox/darksky/front.png")
-//    };
-
     vector<std::string> faces{
+        //slike su izmesane zato su u cudnom redosledu
             FileSystem::getPath("resources/textures/skybox/nightsky/left.png"),
             FileSystem::getPath("resources/textures/skybox/nightsky/right.png"),
             FileSystem::getPath("resources/textures/skybox/nightsky/top.png"),
@@ -249,22 +285,28 @@ int main() {
 
     //load textures
     unsigned int cubemapTexture = loadCubemap(faces);
+    unsigned int floorTexture = loadTexture(FileSystem::getPath("resources/textures/Ground_Forest_skmuqrdaw_4k/Ground_Forest_skmuqrdaw_4k_Albedo.jpg").c_str());
+    unsigned int floorSpecular = loadTexture(FileSystem::getPath("resources/textures/Ground_Forest_skmuqrdaw_4k/Ground_Forest_skmuqrdaw_4k_Specular.jpg").c_str());
 
-
+    //Point light setting
     PointLight& pointLight = programState->pointLight;
-    pointLight.position = glm::vec3(0.0f, 0.0, 20.0);
-    pointLight.ambient = glm::vec3(0.4, 0.4, 0.4);
-    pointLight.diffuse = glm::vec3(0.8, 0.8, 0.8);
-    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
+    //pointLight.position = programState->campfirePosition; //glm::vec3(2.5f, 0.8f, 3.5f);
+    pointLight.ambient = glm::vec3(0.05, 0.05, 0.01);
+    pointLight.diffuse = glm::vec3(0.8, 0.4, 0.3);
+    pointLight.specular = glm::vec3(1.0, 0.6, 0.4);
 
     pointLight.constant = 1.0f;
     pointLight.linear = 0.09f;
     pointLight.quadratic = 0.032f;
 
 
+
     //shader config
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
+    ourShader.use();
+    ourShader.setInt("material.texture_diffuse1", 0);
+    ourShader.setInt("material.texture_specular1", 1);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -293,10 +335,12 @@ int main() {
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
 
-        // don't forget to enable shader before setting uniforms
+        //svetlo se vrti u malom krugu oko centra vatre
+        // daje efekat talasanja plamena :)
         ourShader.use();
-        //pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-        pointLight.position = glm::vec3(0.0f, 20.0f, 0.0f);
+        pointLight.position = glm::vec3(0.1f * cos(currentFrame*2), 0.4f, 0.1f * sin(currentFrame*2));
+        pointLight.position += programState->campfirePosition;
+
         ourShader.setVec3("pointLight.position", pointLight.position);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
@@ -304,20 +348,55 @@ int main() {
         ourShader.setFloat("pointLight.constant", pointLight.constant);
         ourShader.setFloat("pointLight.linear", pointLight.linear);
         ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
+
         ourShader.setVec3("viewPosition", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 32.0f);
+
+        ourShader.setVec3("dirLight.direction", 4.0f, 0.1f, -4.01f);
+        ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.01f);
+        ourShader.setVec3("dirLight.diffuse", 0.2f, 0.2f, 0.08f);
+        ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.16f);
+
+        ourShader.setFloat("material.shininess", 1024.0f);
         // view/projection transformations
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
+
+        glCullFace(GL_BACK);
+
         // render the loaded model
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model,
-                               programState->backpackPosition);// translate it down so it's at the center of the scene
-        //model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(programState->backpackScale));    // it's a bit too big for our scene, so scale it down
+                               programState->forestPosition);// translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(programState->forestScale));    // it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
-        ourModel.Draw(ourShader);
+        forest.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::translate(model, programState->shopPosition);
+        model = glm::scale(model, glm::vec3(programState->shopScale));
+        ourShader.setMat4("model", model);
+        shop.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, programState->campfirePosition);
+        model = glm::scale(model, glm::vec3(programState->campfireScale));
+        ourShader.setMat4("model", model);
+        campfire.Draw(ourShader);
+
+        glCullFace(GL_FRONT);
+
+        //Draw floor
+        ourShader.use();
+        model = glm::mat4(1.0f);
+        ourShader.setMat4("model", model);
+        glBindVertexArray(floorVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, floorSpecular);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //Draw skybox
         glDepthMask(GL_FALSE);
@@ -343,7 +422,7 @@ int main() {
         glfwPollEvents();
     }
 
-    //programState->SaveToFile("resources/program_state.txt");
+    programState->SaveToFile("resources/program_state.txt");
     delete programState;
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -419,8 +498,11 @@ void DrawImGui(ProgramState *programState) {
         ImGui::Text("Hello text");
         ImGui::SliderFloat("Float slider", &f, 0.0, 1.0);
         ImGui::ColorEdit3("Background color", (float *) &programState->clearColor);
-        ImGui::DragFloat3("Backpack position", (float*)&programState->backpackPosition);
-        ImGui::DragFloat("Backpack scale", &programState->backpackScale, 0.05, 0.1, 4.0);
+        ImGui::DragFloat3("Forest position", (float*)&programState->forestPosition);
+        ImGui::DragFloat("Forest scale", &programState->forestScale, 0.05, 0.1, 4.0);
+
+        ImGui::DragFloat3("Shop position", (float*)&programState->shopPosition);
+        ImGui::DragFloat("Shop scale", &programState->shopScale, 0.05, 0.1, 4.0);
 
         ImGui::DragFloat("pointLight.constant", &programState->pointLight.constant, 0.05, 0.0, 1.0);
         ImGui::DragFloat("pointLight.linear", &programState->pointLight.linear, 0.05, 0.0, 1.0);
@@ -482,6 +564,43 @@ unsigned int loadCubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
+}
+
+unsigned int loadTexture(char const * path)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+    if (data)
+    {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // for this tutorial: use GL_CLAMP_TO_EDGE to prevent semi-transparent borders. Due to interpolation it takes texels from next repeat
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
 
     return textureID;
 }
