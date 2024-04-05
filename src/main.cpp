@@ -43,8 +43,8 @@ void renderFloor(Shader ourShader, unsigned int floorVAO, unsigned int floorText
 void renderSkybox(Shader skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
 
 // settings
-const unsigned int SCR_WIDTH = 1600;
-const unsigned int SCR_HEIGHT = 900;
+unsigned int SCR_WIDTH = 1600;
+unsigned int SCR_HEIGHT = 900;
 
 // camera
 
@@ -73,10 +73,11 @@ struct ProgramState {
     Camera camera;
     bool CameraMouseMovementUpdateEnabled = true;
     glm::vec3 forestPosition = glm::vec3(0.0f, -1.0f, 0.0f);
-    glm::vec3 shopPosition = glm::vec3(1.0f, 2.0f, -0.5f);
+    glm::vec3 shopPosition = glm::vec3(1.0f, -0.5f, -1.5f);
     glm::vec3 campfirePosition = glm::vec3(3.1, 0.0, -0.5f);
     glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -6.35f);
     glm::vec3 dirLightPos = glm::vec3(50.0f, -25.0f, 0.0f);
+    float rotationAngle = glm::radians(0.0f);
     float forestScale = 0.1f;
     float shopScale = 1.7f;
     float campfireScale = 1.5f;
@@ -194,7 +195,7 @@ int main() {
     Model forest("resources/objects/forest/scene.gltf");
     forest.SetShaderTextureNamePrefix("material.");
 
-    Model shop("resources/objects/mobile_shop/scene.gltf");
+    Model shop("resources/objects/mobile_shop (1)/untitled.obj");
     shop.SetShaderTextureNamePrefix("material.");
 
     Model campfire("resources/objects/Campfire/PUSHILIN_campfire.obj");
@@ -264,7 +265,7 @@ int main() {
             -1.0f, -1.0f,  1.0f
     };
 
-    glm::vec3 lightPos = glm::vec3(40.0f, 30.0f, 0.01f);
+    glm::vec3 lightPos = programState->dirLightPos;
 
     //skybox VAO
     unsigned int skyboxVAO, skyboxVBO;
@@ -294,14 +295,18 @@ int main() {
     const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
     unsigned int depthMapFBO;
     glGenFramebuffers(1, &depthMapFBO);
+    // create depth texture
     unsigned int depthMap;
     glGenTextures(1, &depthMap);
     glBindTexture(GL_TEXTURE_2D, depthMap);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // attach depth texture as FBO's depth buffer
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
     glDrawBuffer(GL_NONE);
@@ -345,6 +350,7 @@ int main() {
     ourShader.use();
     ourShader.setInt("material.texture_diffuse1", 0);
     ourShader.setInt("material.texture_specular1", 1);
+    ourShader.setInt("shadowMap", 2);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -371,22 +377,38 @@ int main() {
         //rendering scene from lights perspective
         glm::mat4 lightProjection, lightView;
         glm::mat4 lightSpaceMatrix;
-        float near_plane = 1.0f, far_plane = 7.5f;
-        lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-        lightView = glm::lookAt(programState->dirLightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        float near_plane = 1.0f, far_plane = 75.0f;
+        lightProjection = glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
+        lightView = glm::lookAt(-lightPos*0.7f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         lightSpaceMatrix = lightProjection * lightView;
-        // render scene from light's point of view
         simpleDepthShader.use();
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        renderForest(simpleDepthShader, forest);
+        renderShop(simpleDepthShader, shop);
+        renderCampfire(simpleDepthShader, campfire);
+        renderPotion(simpleDepthShader, potion);
 
 
+        renderFloor(simpleDepthShader, floorVAO, floorTexture, floorSpecular);
+        renderSkybox(skyboxShader, skyboxVAO, cubemapTexture);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        //reset viewport
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
         //view/projection matrices
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
+
 
         //svetlo se vrti u malom krugu oko centra vatre
         // daje efekat talasanja plamena :)
@@ -413,6 +435,9 @@ int main() {
         // view/projection transformations
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
+        ourShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
 
         glCullFace(GL_BACK);
 
@@ -473,7 +498,9 @@ void processInput(GLFWwindow *window) {
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
-    glViewport(0, 0, width, height);
+    //glViewport(0, 0, width, height);
+    SCR_WIDTH = width;
+    SCR_HEIGHT = height;
 }
 
 // glfw: whenever the mouse moves, this callback is called
@@ -506,6 +533,14 @@ void DrawImGui(ProgramState *programState) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    { // FPS counter
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        ImGui::SetNextWindowPos(ImVec2(static_cast<float>(SCR_WIDTH - 60), 0));
+        ImGui::SetNextWindowSize(ImVec2(60, 50));
+        ImGui::Begin("FPS:", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        ImGui::Text("%.2f", std::floor(1 / deltaTime));
+        ImGui::End();
+    }
 
     {
         static float f = 0.0f;
@@ -524,6 +559,7 @@ void DrawImGui(ProgramState *programState) {
 
         ImGui::DragFloat3("Campfire position", (float*)&programState->campfirePosition);
         ImGui::DragFloat("Campfire scale", &programState->campfireScale, 0.05, 0.1, 4.0);
+        ImGui::DragFloat3("Rotate dragon", (float*)&programState->rotationAngle);
 
         ImGui::DragFloat3("Potion position", (float*)&programState->potionPosition);
         ImGui::DragFloat("Potion scale", &programState->potionScale, 0.05, 0.1, 4.0);
@@ -641,8 +677,8 @@ void renderForest(Shader ourShader, Model forest){
 void renderShop(Shader ourShader, Model shop){
     //render shop
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     model = glm::translate(model, programState->shopPosition);
+    model = glm::rotate(model, programState->rotationAngle, glm::vec3(1.0f, 0.0f, 0.0f));
     model = glm::scale(model, glm::vec3(programState->shopScale));
     ourShader.setMat4("model", model);
     ourShader.setFloat("material.shininess", 256.0f);
