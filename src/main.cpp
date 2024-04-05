@@ -186,7 +186,7 @@ int main() {
     Model campfire("resources/objects/Campfire/PUSHILIN_campfire.obj");
     campfire.SetShaderTextureNamePrefix("material.");
 
-    Model potion("resources/objects/potion/scene.gltf");
+    Model potion("resources/objects/potion/scene.gltf"); //predstavlja funkcionisanje discard blendinga
     potion.SetShaderTextureNamePrefix("material.");
 
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
@@ -292,6 +292,7 @@ int main() {
     unsigned int floorTexture = loadTexture(FileSystem::getPath("resources/textures/Ground_Forest_skmuqrdaw_4k/Ground_Forest_skmuqrdaw_4k_Albedo.jpg").c_str());
     unsigned int floorSpecular = loadTexture(FileSystem::getPath("resources/textures/Ground_Forest_skmuqrdaw_4k/Ground_Forest_skmuqrdaw_4k_Specular.jpg").c_str());
 
+
     //Point light setting
     PointLight& pointLight = programState->pointLight;
     //pointLight.position = programState->campfirePosition; //glm::vec3(2.5f, 0.8f, 3.5f);
@@ -334,6 +335,7 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
         //view/projection matrices
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
@@ -355,16 +357,15 @@ int main() {
 
         ourShader.setVec3("viewPosition", programState->camera.Position);
 
-        ourShader.setVec3("dirLight.direction", 4.0f, 0.1f, -4.01f);
+        ourShader.setVec3("dirLight.direction", 4.0f, 0.1f, 0.01f);
         ourShader.setVec3("dirLight.ambient", 0.05f, 0.05f, 0.01f);
         ourShader.setVec3("dirLight.diffuse", 0.2f, 0.2f, 0.08f);
         ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.16f);
 
-        ourShader.setFloat("material.shininess", 1024.0f);
+        ourShader.setFloat("material.shininess", 32.0f);
         // view/projection transformations
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
-
 
         glCullFace(GL_BACK);
 
@@ -381,7 +382,10 @@ int main() {
         model = glm::translate(model, programState->shopPosition);
         model = glm::scale(model, glm::vec3(programState->shopScale));
         ourShader.setMat4("model", model);
+        ourShader.setFloat("material.shininess", 256.0f);
         shop.Draw(ourShader);
+
+        ourShader.setFloat("material.shininess", 32.0f);
 
         //render campfire
         model = glm::mat4(1.0f);
@@ -403,6 +407,7 @@ int main() {
         ourShader.use();
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
+        ourShader.setFloat("material.shininess", 1024.0f);
         glBindVertexArray(floorVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, floorTexture);
