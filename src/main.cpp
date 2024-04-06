@@ -79,7 +79,6 @@ struct ProgramState {
     glm::vec3 campfirePosition = glm::vec3(3.1, 0.0, -0.5f);
     glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -5.9f);
     glm::vec3 dirLightPos = glm::vec3(50.0f, -25.0f, 0.0f);
-    float rotationAngle = glm::radians(0.0f);
     float forestScale = 0.1f;
     float shopScale = 1.7f;
     float campfireScale = 1.5f;
@@ -356,7 +355,6 @@ int main() {
 
     //Point light setting
     PointLight& pointLight = programState->pointLight;
-    //pointLight.position = programState->campfirePosition; //glm::vec3(2.5f, 0.8f, 3.5f);
     pointLight.ambient = glm::vec3(0.05, 0.05, 0.01);
     pointLight.diffuse = glm::vec3(0.8, 0.4, 0.3);
     pointLight.specular = glm::vec3(1.0, 0.6, 0.4);
@@ -468,7 +466,7 @@ int main() {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-
+        //rendering scene with shadows
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -536,6 +534,23 @@ int main() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
+    glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteBuffers(1, &skyboxVBO);
+    glDeleteTextures(1, &cubemapTexture);
+
+    glDeleteVertexArrays(1, &floorVAO);
+    glDeleteBuffers(1, &floorVBO);
+    glDeleteTextures(1, &floorTexture);
+    glDeleteTextures(1, &floorSpecular);
+
+
+    glDeleteFramebuffers(1, &depthMapFBO);
+    glDeleteTextures(1, &depthMap);
+
+    glDeleteFramebuffers(1, &point_depthMapFBO);
+    glDeleteTextures(1, &point_depthCubemap);
+
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
@@ -618,7 +633,7 @@ void DrawImGui(ProgramState *programState) {
         ImGui::SliderFloat("Float slider", &f, 0.0, 1.0);
         ImGui::ColorEdit3("Background color", (float *) &programState->clearColor);
 
-        ImGui::DragFloat3("Moonlight position", (float*)&programState->dirLightPos);
+        ImGui::DragFloat3("DirLight position", (float*)&programState->dirLightPos);
 
         ImGui::DragFloat3("Forest position", (float*)&programState->forestPosition);
         ImGui::DragFloat("Forest scale", &programState->forestScale, 0.05, 0.1, 4.0);
@@ -628,7 +643,6 @@ void DrawImGui(ProgramState *programState) {
 
         ImGui::DragFloat3("Campfire position", (float*)&programState->campfirePosition);
         ImGui::DragFloat("Campfire scale", &programState->campfireScale, 0.05, 0.1, 4.0);
-        ImGui::DragFloat("Rotate dragon", (float*)&programState->rotationAngle);
 
         ImGui::DragFloat3("Potion position", (float*)&programState->potionPosition);
         ImGui::DragFloat("Potion scale", &programState->potionScale, 0.05, 0.1, 4.0);
@@ -747,7 +761,6 @@ void renderShop(Shader& ourShader, Model& shop){
     //render shop
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->shopPosition);
-    model = glm::rotate(model, programState->rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::scale(model, glm::vec3(programState->shopScale));
     ourShader.setMat4("model", model);
     ourShader.setFloat("material.shininess", 256.0f);
