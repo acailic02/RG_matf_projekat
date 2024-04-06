@@ -75,7 +75,7 @@ struct ProgramState {
     glm::vec3 forestPosition = glm::vec3(0.0f, -1.0f, 0.0f);
     glm::vec3 shopPosition = glm::vec3(1.0f, -0.5f, -1.5f);
     glm::vec3 campfirePosition = glm::vec3(3.1, 0.0, -0.5f);
-    glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -6.35f);
+    glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -5.9f);
     glm::vec3 dirLightPos = glm::vec3(50.0f, -25.0f, 0.0f);
     float rotationAngle = glm::radians(0.0f);
     float forestScale = 0.1f;
@@ -189,6 +189,7 @@ int main() {
     Shader ourShader("resources/shaders/2.model_lighting.vs", "resources/shaders/2.model_lighting.fs");
     Shader skyboxShader("resources/shaders/skybox.vs", "resources/shaders/skybox.fs");
     Shader simpleDepthShader("resources/shaders/shadow_mapping_depth.vs", "resources/shaders/shadow_mapping_depth.fs");
+    Shader pointShadowsShader("resources/shaders/point_shadows_depth.vs", "resources/shaders/point_shadows_depth.fs", "resources/shaders/point_shadows_depth.gs");
 
     // load models
     // -----------
@@ -313,6 +314,25 @@ int main() {
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    //point_depthMap FBO
+    unsigned int point_depthMapFBO;
+    glGenFramebuffers(1, &point_depthMapFBO);
+    unsigned int point_depthCubemap;
+    glGenTextures(1, &point_depthCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, point_depthCubemap);
+    for (unsigned int i = 0; i < 6; ++i)
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, point_depthMapFBO);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, point_depthCubemap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     //Cubemap textures
     stbi_set_flip_vertically_on_load(false);
     vector<std::string> faces{
@@ -379,7 +399,7 @@ int main() {
         glm::mat4 lightSpaceMatrix;
         float near_plane = 1.0f, far_plane = 75.0f;
         lightProjection = glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
-        lightView = glm::lookAt(-lightPos*0.7f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        lightView = glm::lookAt(-lightPos*0.6f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
         lightSpaceMatrix = lightProjection * lightView;
         simpleDepthShader.use();
         simpleDepthShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
