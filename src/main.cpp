@@ -30,17 +30,19 @@ unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const * path);
 
-void renderForest(Shader ourShader, Model forest);
+void renderForest(Shader& ourShader, Model& forest);
 
-void renderShop(Shader ourShader, Model shop);
+void renderShop(Shader& ourShader, Model& shop);
 
-void renderCampfire(Shader ourShader, Model campfire);
+void renderCampfire(Shader& ourShader, Model& campfire);
 
-void renderPotion(Shader ourShader, Model potion);
+void renderPotion(Shader& ourShader, Model& potion);
 
-void renderFloor(Shader ourShader, unsigned int floorVAO, unsigned int floorTexture, unsigned int floorSpecular);
+void renderFloor(Shader& ourShader, unsigned int floorVAO, unsigned int floorTexture, unsigned int floorSpecular);
 
-void renderSkybox(Shader skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
+void renderSkybox(Shader& skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
+
+void renderCube();
 
 // settings
 unsigned int SCR_WIDTH = 1600;
@@ -372,6 +374,7 @@ int main() {
     ourShader.setInt("material.texture_diffuse1", 0);
     ourShader.setInt("material.texture_specular1", 1);
     ourShader.setInt("shadowMap", 2);
+    ourShader.setInt("point_depthMap", 3);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -395,7 +398,7 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        //rendering scene from lights perspective
+        //rendering scene from lights perspective (dir light)
         glm::mat4 lightProjection, lightView;
         glm::mat4 lightSpaceMatrix;
         float near_plane = 1.0f, far_plane = 75.0f;
@@ -409,11 +412,14 @@ int main() {
         glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
         glClear(GL_DEPTH_BUFFER_BIT);
 
+        glCullFace(GL_BACK);
+
         renderForest(simpleDepthShader, forest);
         renderShop(simpleDepthShader, shop);
         renderCampfire(simpleDepthShader, campfire);
         renderPotion(simpleDepthShader, potion);
 
+        glCullFace(GL_FRONT);
 
         renderFloor(simpleDepthShader, floorVAO, floorTexture, floorSpecular);
         renderSkybox(skyboxShader, skyboxVAO, cubemapTexture);
@@ -424,6 +430,47 @@ int main() {
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        //rendering scene from point lights perspective (omnidirectional)
+        pointLight.position = glm::vec3(0.1f * cos(currentFrame*2), 0.4f, 0.1f * sin(currentFrame*2));
+        pointLight.position += programState->campfirePosition;
+
+        glm::vec3 lightPos2 = glm::vec3(pointLight.position);
+        glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), (float)SHADOW_WIDTH / (float)SHADOW_HEIGHT, near_plane, far_plane);
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos2, lightPos2 + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)));
+
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, point_depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        pointShadowsShader.use();
+        for (unsigned int i = 0; i < 6; ++i)
+            pointShadowsShader.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]);
+        pointShadowsShader.setFloat("far_plane", far_plane);
+        pointShadowsShader.setVec3("lightPos", lightPos2);
+
+        glCullFace(GL_BACK);
+
+        renderForest(pointShadowsShader, forest);
+        renderShop(pointShadowsShader, shop);
+        renderCampfire(pointShadowsShader, campfire);
+        renderPotion(pointShadowsShader, potion);
+
+        glCullFace(GL_FRONT);
+
+        renderFloor(pointShadowsShader, floorVAO, floorTexture, floorSpecular);
+        renderSkybox(skyboxShader, skyboxVAO, cubemapTexture);
+        renderCube();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //view/projection matrices
         glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
@@ -434,10 +481,7 @@ int main() {
         //svetlo se vrti u malom krugu oko centra vatre
         // daje efekat talasanja plamena :)
         ourShader.use();
-        pointLight.position = glm::vec3(0.1f * cos(currentFrame*2), 0.4f, 0.1f * sin(currentFrame*2));
-        pointLight.position += programState->campfirePosition;
-
-        ourShader.setVec3("pointLight.position", pointLight.position);
+        ourShader.setVec3("pointLight.position", lightPos2);
         ourShader.setVec3("pointLight.ambient", pointLight.ambient);
         ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
         ourShader.setVec3("pointLight.specular", pointLight.specular);
@@ -457,8 +501,11 @@ int main() {
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
         ourShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        ourShader.setFloat("far_plane", far_plane);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, depthMap);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, point_depthCubemap);
 
         glCullFace(GL_BACK);
 
@@ -471,6 +518,7 @@ int main() {
 
         renderFloor(ourShader, floorVAO, floorTexture, floorSpecular);
         renderSkybox(skyboxShader, skyboxVAO, cubemapTexture);
+        renderCube();
 
         if (programState->ImGuiEnabled)
             DrawImGui(programState);
@@ -580,7 +628,7 @@ void DrawImGui(ProgramState *programState) {
 
         ImGui::DragFloat3("Campfire position", (float*)&programState->campfirePosition);
         ImGui::DragFloat("Campfire scale", &programState->campfireScale, 0.05, 0.1, 4.0);
-        ImGui::DragFloat3("Rotate dragon", (float*)&programState->rotationAngle);
+        ImGui::DragFloat("Rotate dragon", (float*)&programState->rotationAngle);
 
         ImGui::DragFloat3("Potion position", (float*)&programState->potionPosition);
         ImGui::DragFloat("Potion scale", &programState->potionScale, 0.05, 0.1, 4.0);
@@ -686,7 +734,7 @@ unsigned int loadTexture(char const * path)
     return textureID;
 }
 
-void renderForest(Shader ourShader, Model forest){
+void renderForest(Shader& ourShader, Model& forest){
     //render forest
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model,programState->forestPosition);
@@ -695,18 +743,18 @@ void renderForest(Shader ourShader, Model forest){
     forest.Draw(ourShader);
 }
 
-void renderShop(Shader ourShader, Model shop){
+void renderShop(Shader& ourShader, Model& shop){
     //render shop
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->shopPosition);
-    model = glm::rotate(model, programState->rotationAngle, glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::rotate(model, programState->rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::scale(model, glm::vec3(programState->shopScale));
     ourShader.setMat4("model", model);
     ourShader.setFloat("material.shininess", 256.0f);
     shop.Draw(ourShader);
 }
 
-void renderCampfire(Shader ourShader, Model campfire){
+void renderCampfire(Shader& ourShader, Model& campfire){
     //render campfire
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->campfirePosition);
@@ -715,7 +763,7 @@ void renderCampfire(Shader ourShader, Model campfire){
     campfire.Draw(ourShader);
 }
 
-void renderPotion(Shader ourShader, Model potion){
+void renderPotion(Shader& ourShader, Model& potion){
     //render potion
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->potionPosition);
@@ -724,7 +772,7 @@ void renderPotion(Shader ourShader, Model potion){
     potion.Draw(ourShader);
 }
 
-void renderFloor(Shader ourShader, unsigned int floorVAO, unsigned int floorTexture, unsigned int floorSpecular){
+void renderFloor(Shader& ourShader, unsigned int floorVAO, unsigned int floorTexture, unsigned int floorSpecular){
     //Draw floor
     ourShader.use();
     glm::mat4 model = glm::mat4(1.0f);
@@ -738,7 +786,7 @@ void renderFloor(Shader ourShader, unsigned int floorVAO, unsigned int floorText
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void renderSkybox(Shader skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture){
+void renderSkybox(Shader& skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture){
     //copied code for procetion and view matrix
     glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),(float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = programState->camera.GetViewMatrix();
