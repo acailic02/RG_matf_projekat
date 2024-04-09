@@ -374,6 +374,8 @@ int main() {
     ourShader.setInt("material.texture_specular1", 1);
     ourShader.setInt("shadowMap", 2);
     ourShader.setInt("point_depthMap", 3);
+    campfireShader.use();
+    campfireShader.setInt("texture_diffuse1", 0);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
