@@ -77,9 +77,9 @@ struct ProgramState {
     glm::vec3 forestPosition = glm::vec3(0.0f, -1.0f, 0.0f);
     glm::vec3 shopPosition = glm::vec3(1.0f, -0.5f, -1.5f);
     glm::vec3 campfirePosition = glm::vec3(3.1, 0.0, -0.5f);
-    glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -5.9f);
+    glm::vec3 potionPosition = glm::vec3(1.2f, 2.82f, -4.9f);
     glm::vec3 dirLightPos = glm::vec3(50.0f, -25.0f, 0.0f);
-    float forestScale = 0.1f;
+    float forestScale = 10.0f;
     float shopScale = 1.7f;
     float campfireScale = 1.5f;
     float potionScale = 1.0f;
@@ -195,7 +195,7 @@ int main() {
 
     // load models
     // -----------
-    Model forest("resources/objects/forest/scene.gltf");
+    Model forest("resources/objects/forest/forest.obj");
     forest.SetShaderTextureNamePrefix("material.");
 
     Model shop("resources/objects/mobile_shop (1)/untitled.obj");
@@ -204,7 +204,7 @@ int main() {
     Model campfire("resources/objects/Campfire/PUSHILIN_campfire.obj");
     campfire.SetShaderTextureNamePrefix("material.");
 
-    Model potion("resources/objects/potion/scene.gltf"); //predstavlja funkcionisanje discard blendinga
+    Model potion("resources/objects/potion/potion.obj"); //predstavlja funkcionisanje discard blendinga
     potion.SetShaderTextureNamePrefix("material.");
 
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
