@@ -43,6 +43,8 @@ uniform sampler2D shadowMap;
 uniform samplerCube point_depthMap;
 uniform float far_plane;
 
+uniform float alpha;
+
 // array of offset direction for sampling
 vec3 gridSamplingDisk[20] = vec3[]
 (
@@ -199,7 +201,7 @@ void main()
         discard;
     vec3 result = CalcPointLight(pointLight, normal, FragPos, viewDir, TexCoords, material, TexColor);
     result += CalcDirLight(dirLight, normal, viewDir, TexColor);
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(result, alpha);
 
 
 }

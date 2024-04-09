@@ -191,6 +191,7 @@ int main() {
     Shader skyboxShader("resources/shaders/skybox.vs", "resources/shaders/skybox.fs");
     Shader simpleDepthShader("resources/shaders/shadow_mapping_depth.vs", "resources/shaders/shadow_mapping_depth.fs");
     Shader pointShadowsShader("resources/shaders/point_shadows_depth.vs", "resources/shaders/point_shadows_depth.fs", "resources/shaders/point_shadows_depth.gs");
+    Shader campfireShader("resources/shaders/campfire.vs", "resources/shaders/campfire.fs");
 
     // load models
     // -----------
@@ -414,7 +415,7 @@ int main() {
 
         renderForest(simpleDepthShader, forest);
         renderShop(simpleDepthShader, shop);
-        renderCampfire(simpleDepthShader, campfire);
+        //renderCampfire(simpleDepthShader, campfire);
         renderPotion(simpleDepthShader, potion);
 
         glCullFace(GL_FRONT);
@@ -429,7 +430,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //rendering scene from point lights perspective (omnidirectional)
-        pointLight.position = glm::vec3(0.1f * cos(currentFrame*2), 0.4f, 0.1f * sin(currentFrame*2));
+        pointLight.position = glm::vec3(0.15f * cos(currentFrame*2), 1.0f, 0.1f * sin(currentFrame*2));
         pointLight.position += programState->campfirePosition;
 
         glm::vec3 lightPos2 = glm::vec3(pointLight.position);
@@ -455,7 +456,7 @@ int main() {
 
         renderForest(pointShadowsShader, forest);
         renderShop(pointShadowsShader, shop);
-        renderCampfire(pointShadowsShader, campfire);
+        //renderCampfire(pointShadowsShader, campfire);
         renderPotion(pointShadowsShader, potion);
 
         glCullFace(GL_FRONT);
@@ -475,6 +476,10 @@ int main() {
                                                 (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = programState->camera.GetViewMatrix();
 
+
+        campfireShader.use();
+        campfireShader.setMat4("projection", projection);
+        campfireShader.setMat4("view", view);
 
         //svetlo se vrti u malom krugu oko centra vatre
         // daje efekat talasanja plamena :)
@@ -500,6 +505,7 @@ int main() {
         ourShader.setMat4("view", view);
         ourShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         ourShader.setFloat("far_plane", far_plane);
+        ourShader.setFloat("alpha", 1.0f);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, depthMap);
         glActiveTexture(GL_TEXTURE3);
@@ -509,7 +515,7 @@ int main() {
 
         renderForest(ourShader, forest);
         renderShop(ourShader, shop);
-        renderCampfire(ourShader, campfire);
+        renderCampfire(campfireShader, campfire);
         renderPotion(ourShader, potion);
 
         glCullFace(GL_FRONT);
@@ -750,6 +756,7 @@ unsigned int loadTexture(char const * path)
 
 void renderForest(Shader& ourShader, Model& forest){
     //render forest
+    ourShader.use();
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model,programState->forestPosition);
     model = glm::scale(model, glm::vec3(programState->forestScale));
@@ -759,6 +766,7 @@ void renderForest(Shader& ourShader, Model& forest){
 
 void renderShop(Shader& ourShader, Model& shop){
     //render shop
+    ourShader.use();
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->shopPosition);
     model = glm::scale(model, glm::vec3(programState->shopScale));
@@ -769,6 +777,7 @@ void renderShop(Shader& ourShader, Model& shop){
 
 void renderCampfire(Shader& ourShader, Model& campfire){
     //render campfire
+    ourShader.use();
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->campfirePosition);
     model = glm::scale(model, glm::vec3(programState->campfireScale));
@@ -778,6 +787,7 @@ void renderCampfire(Shader& ourShader, Model& campfire){
 
 void renderPotion(Shader& ourShader, Model& potion){
     //render potion
+    ourShader.use();
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, programState->potionPosition);
     model = glm::scale(model, glm::vec3(programState->potionScale));
